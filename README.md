@@ -2,7 +2,8 @@
 
 ## Environment
 - Android S OS (12)
-- Galaxy S20
+- minSdk 24 (N OS)
+- Galaxy S20, Galaxy S10
 - Google ARCore SDK
 
 ## Techniques
