@@ -65,6 +65,8 @@ import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.common.base.Preconditions;
 import com.google.firebase.database.DatabaseError;
 import java.io.IOException;
+import java.util.ArrayList;
+
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
@@ -97,7 +99,7 @@ public class CloudAnchorActivity extends AppCompatActivity
   private boolean installRequested;
 
   // Temporary matrices allocated here to reduce number of allocations for each frame.
-  private final float[] anchorMatrix = new float[16];
+  private final ArrayList<float[]> anchorMatrixList = new ArrayList<float[]>(16);
   private final float[] viewMatrix = new float[16];
   private final float[] projectionMatrix = new float[16];
 
@@ -115,7 +117,11 @@ public class CloudAnchorActivity extends AppCompatActivity
   private TextView roomCodeText;
   private SharedPreferences sharedPreferences;
   private static final String PREFERENCE_FILE_KEY = "allow_sharing_images";
+
+  /** 카메라 사용자 권한 유무 저장 */
   private static final String ALLOW_SHARE_IMAGES_KEY = "ALLOW_SHARE_IMAGES";
+
+
 
   @GuardedBy("singleTapLock")
   private MotionEvent queuedSingleTap;
@@ -123,7 +129,9 @@ public class CloudAnchorActivity extends AppCompatActivity
   private Session session;
 
   @GuardedBy("anchorLock")
-  private Anchor anchor;
+  private ArrayList<Anchor> anchors = new ArrayList<Anchor>();
+
+
 
   // Cloud Anchor Components.
   private FirebaseManager firebaseManager;
@@ -137,11 +145,14 @@ public class CloudAnchorActivity extends AppCompatActivity
 
     setContentView(R.layout.activity_main);
 
+    // Open GL로 이미지 표시하는 뷰
     surfaceView = findViewById(R.id.surfaceview);
+
+    // 화면 회전 관리
     displayRotationHelper = new DisplayRotationHelper(this);
 
 
-    // Set up touch listener.
+    // 사용자 입력 옵저버 탑재
     gestureDetector =
         new GestureDetector(
             this,
@@ -149,6 +160,7 @@ public class CloudAnchorActivity extends AppCompatActivity
               @Override
               public boolean onSingleTapUp(MotionEvent e) {
                 synchronized (singleTapLock) {
+                  // 호스트 모드일 때 큐를 MotionEvent 로 할당
                   if (currentMode == HostResolveMode.HOSTING) {
                     queuedSingleTap = e;
                   }
@@ -163,7 +175,7 @@ public class CloudAnchorActivity extends AppCompatActivity
             });
     surfaceView.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
 
-    // Set up renderer.
+    // GL 랜더러 설정
     surfaceView.setPreserveEGLContextOnPause(true);
     surfaceView.setEGLContextClientVersion(2);
     surfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0); // Alpha used for plane blending.
@@ -172,19 +184,27 @@ public class CloudAnchorActivity extends AppCompatActivity
     surfaceView.setWillNotDraw(false);
     installRequested = false;
 
-    // Initialize UI components.
+    // UI Framework 설정
     hostButton = findViewById(R.id.host_button);
     hostButton.setOnClickListener((view) -> onHostButtonPress());
     resolveButton = findViewById(R.id.resolve_button);
     resolveButton.setOnClickListener((view) -> onResolveButtonPress());
     roomCodeText = findViewById(R.id.room_code_text);
 
-    // Initialize Cloud Anchor variables.
+    // Cloud Anchor 설정
     firebaseManager = new FirebaseManager(this);
+
+    // HOST, RESOLVE 모드 설정
     currentMode = HostResolveMode.NONE;
     sharedPreferences = getSharedPreferences(PREFERENCE_FILE_KEY, Context.MODE_PRIVATE);
   }
 
+
+
+
+
+
+  // [X]
   @Override
   protected void onDestroy() {
     // Clear all registered listeners.
@@ -202,6 +222,7 @@ public class CloudAnchorActivity extends AppCompatActivity
     super.onDestroy();
   }
 
+  // [X]
   @Override
   protected void onResume() {
     super.onResume();
@@ -211,9 +232,12 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
     snackbarHelper.showMessage(this, getString(R.string.snackbar_initial_message));
     surfaceView.onResume();
+
+    // 화면 회전 관리
     displayRotationHelper.onResume();
   }
 
+  // [X] 세션 생성 (분석 불필요)
   private void createSession() {
     if (session == null) {
       Exception exception = null;
@@ -226,13 +250,19 @@ public class CloudAnchorActivity extends AppCompatActivity
           case INSTALLED:
             break;
         }
+
+
+        // ARCore 사용자 권한 관리
         // ARCore requires camera permissions to operate. If we did not yet obtain runtime
         // permission on Android M and above, now is a good time to ask the user for it.
         if (!CameraPermissionHelper.hasCameraPermission(this)) {
           CameraPermissionHelper.requestCameraPermission(this);
           return;
         }
+
+        // 세션 생성
         session = new Session(this);
+
       } catch (UnavailableArcoreNotInstalledException e) {
         messageId = R.string.snackbar_arcore_unavailable;
         exception = e;
@@ -273,6 +303,7 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
   }
 
+  // [X]
   @Override
   public void onPause() {
     super.onPause();
@@ -280,12 +311,16 @@ public class CloudAnchorActivity extends AppCompatActivity
       // Note that the order matters - GLSurfaceView is paused first so that it does not try
       // to query the session. If Session is paused before GLSurfaceView, GLSurfaceView may
       // still call session.update() and get a SessionPausedException.
+
+      // 화면 회전 관리
       displayRotationHelper.onPause();
+
       surfaceView.onPause();
       session.pause();
     }
   }
 
+  // [X]
   @Override
   public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
     super.onRequestPermissionsResult(requestCode, permissions, results);
@@ -300,11 +335,18 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
   }
 
+  // [X]
   @Override
   public void onWindowFocusChanged(boolean hasFocus) {
     super.onWindowFocusChanged(hasFocus);
     FullScreenHelper.setFullScreenOnWindowFocusChanged(this, hasFocus);
   }
+
+
+
+
+
+
 
   /**
    * Handles the most recent user tap.
@@ -317,31 +359,75 @@ public class CloudAnchorActivity extends AppCompatActivity
   private void handleTap(Frame frame, TrackingState cameraTrackingState) {
     // Handle taps. Handling only one tap per frame, as taps are usually low frequency
     // compared to frame rate.
-    synchronized (singleTapLock) {
-      synchronized (anchorLock) {
+    // 프레임 흐를 때 계속 구동됨
+
+    synchronized (singleTapLock) { // singleTapLock mutex lock
+
+      synchronized (anchorLock) { // anchor mutex lock
+
         // Only handle a tap if the anchor is currently null, the queued tap is non-null and the
         // camera is currently tracking.
-        if (anchor == null
-            && queuedSingleTap != null
-            && cameraTrackingState == TrackingState.TRACKING) {
-          Preconditions.checkState(
-              currentMode == HostResolveMode.HOSTING,
-              "We should only be creating an anchor in hosting mode.");
+
+        // 설정된 엥커가 없고, single tap queue가 비어있지 않을 때, camera가 tracking 상태일 때
+
+
+
+//        Log.e("=========", anchor + ", " + queuedSingleTap + ", " + cameraTrackingState);
+
+        // TODO: 앵커 여러 개 배치
+//        if (anchor == null  &&  queuedSingleTap != null  &&  cameraTrackingState == TrackingState.TRACKING) {
+        if (queuedSingleTap != null  &&  cameraTrackingState == TrackingState.TRACKING) {
+
+          //////////////////////////////////////////////////////////////////////////////////////////
+          //////////////////////////////////////////////////////////////////////////////////////////
+          // HOST일 경우, 앵커 생성
+          // 조건이 맞지 않을경우 IllegalStateException
+
+          // TODO: resolver도 배치 가능하도록 함
+//          Preconditions.checkState(
+//              currentMode == HostResolveMode.HOSTING,
+//              "We should only be creating an anchor in hosting mode.");
+
+
+
+          // for (var a in array){} 문법이랑 동일
           for (HitResult hit : frame.hitTest(queuedSingleTap)) {
+
+            // Ray casting 된 포인트에 엥커 설치가 가능한 경우
             if (shouldCreateAnchorWithHit(hit)) {
+
+              // hit: HitResult 안에 좌표 등 다양한 정보 있음
               Anchor newAnchor = hit.createAnchor();
+
+              // hostListener
               Preconditions.checkNotNull(hostListener, "The host listener cannot be null.");
+
+              // 새로운 엥커를 host로 발송
               cloudManager.hostCloudAnchor(newAnchor, hostListener);
+
+
+
+              // anchor에 새로운 엥커값을 대입
               setNewAnchor(newAnchor);
+
+              if(snackbarHelper.isShowing()){
+                snackbarHelper.hide(this);
+              }
               snackbarHelper.showMessage(this, getString(R.string.snackbar_anchor_placed));
+              snackbarHelper.showMessage(this, getString(R.string.snackbar_anchor_placed));
+
               break; // Only handle the first valid hit.
             }
           }
+
+
+
         }
       }
       queuedSingleTap = null;
     }
   }
+
 
   /** Returns {@code true} if and only if the hit can be used to create an Anchor reliably. */
   private static boolean shouldCreateAnchorWithHit(HitResult hit) {
@@ -356,6 +442,8 @@ public class CloudAnchorActivity extends AppCompatActivity
     return false;
   }
 
+
+  // 세션 시작 후 평면 잡았을 때 호출됨
   @Override
   public void onSurfaceCreated(GL10 gl, EGLConfig config) {
     GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -367,7 +455,9 @@ public class CloudAnchorActivity extends AppCompatActivity
       planeRenderer.createOnGlThread(this, "models/trigrid.png");
       pointCloudRenderer.createOnGlThread(this);
 
-      // 모델 변경 코드
+      // TODO: 모델을 여러 개 바꾸는 기능
+      // 모델 세팅 코드
+      // virtualObject -> 배열로 관리하고 별도 idx queue를 만들어서 관리
       virtualObject.createOnGlThread(this, "models/andy.obj", "models/andy.png");
       virtualObject.setMaterialProperties(0.0f, 2.0f, 0.5f, 6.0f);
 
@@ -375,29 +465,42 @@ public class CloudAnchorActivity extends AppCompatActivity
           this, "models/andy_shadow.obj", "models/andy_shadow.png");
       virtualObjectShadow.setBlendMode(BlendMode.Shadow);
       virtualObjectShadow.setMaterialProperties(1.0f, 0.0f, 0.0f, 1.0f);
+
+
+
     } catch (IOException ex) {
       Log.e(TAG, "Failed to read an asset file", ex);
     }
   }
 
+
+  // 세션 시작 후 평면 변경되었을 때 호출됨
   @Override
   public void onSurfaceChanged(GL10 gl, int width, int height) {
+    // 화면 회전 관리
     displayRotationHelper.onSurfaceChanged(width, height);
     GLES20.glViewport(0, 0, width, height);
   }
 
+
+  // 프레임을 그릴 때 (프레임이 넘어갈 때마다) 호출됨
   @Override
   public void onDrawFrame(GL10 gl) {
     // Clear screen to notify driver it should not load any pixels from previous frame.
+    // 리셋
     GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
+    // 세션이 없을 때 동작 안함
     if (session == null) {
       return;
     }
     // Notify ARCore session that the view size changed so that the perspective matrix and
     // the video background can be properly adjusted.
+
+    // 화면 회전 관리
     displayRotationHelper.updateSessionIfNeeded(session);
 
+    // 화면을 그리는 부분
     try {
       session.setCameraTextureName(backgroundRenderer.getTextureId());
 
@@ -441,14 +544,36 @@ public class CloudAnchorActivity extends AppCompatActivity
           session.getAllTrackables(Plane.class), camera.getDisplayOrientedPose(), projectionMatrix);
 
       // Check if the anchor can be visualized or not, and get its pose if it can be.
+
+
+      // TODO: 앵커 여러 개 배치
+      // anchor를 anchorMatrix로 변환하는 과정이 있음
+      // anchor, anchorMatrix 둘 다 배열로 관리해야 함
       boolean shouldDrawAnchor = false;
       synchronized (anchorLock) {
-        if (anchor != null && anchor.getTrackingState() == TrackingState.TRACKING) {
-          // Get the current pose of an Anchor in world space. The Anchor pose is updated
-          // during calls to session.update() as ARCore refines its estimate of the world.
-          anchor.getPose().toMatrix(anchorMatrix, 0);
-          shouldDrawAnchor = true;
+
+        anchorMatrixList.clear();
+
+        for (Anchor anchor : anchors){
+          if (anchor != null && anchor.getTrackingState() == TrackingState.TRACKING) {
+            // Get the current pose of an Anchor in world space. The Anchor pose is updated
+            // during calls to session.update() as ARCore refines its estimate of the world.
+
+            final float[] anchorMatrix = new float[16];
+            anchor.getPose().toMatrix(anchorMatrix, 0);
+
+            anchorMatrixList.add(anchorMatrix);
+
+          }
         }
+
+        if(!anchorMatrixList.isEmpty()){
+          shouldDrawAnchor = true;
+        } else {
+          shouldDrawAnchor = false;
+        }
+
+
       }
 
       // Visualize anchor.
@@ -458,10 +583,18 @@ public class CloudAnchorActivity extends AppCompatActivity
 
         // Update and draw the model and its shadow.
         float scaleFactor = 1.0f;
-        virtualObject.updateModelMatrix(anchorMatrix, scaleFactor);
-        virtualObjectShadow.updateModelMatrix(anchorMatrix, scaleFactor);
-        virtualObject.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, OBJECT_COLOR);
-        virtualObjectShadow.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, OBJECT_COLOR);
+
+
+        for (float[] anchorMatrix : anchorMatrixList) {
+
+          virtualObject.updateModelMatrix(anchorMatrix, scaleFactor);
+          virtualObjectShadow.updateModelMatrix(anchorMatrix, scaleFactor);
+          virtualObject.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, OBJECT_COLOR);
+          virtualObjectShadow.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, OBJECT_COLOR);
+
+        }
+
+
       }
     } catch (Throwable t) {
       // Avoid crashing the application due to unhandled exceptions.
@@ -469,14 +602,47 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
   }
 
+
   /** Sets the new value of the current anchor. Detaches the old anchor, if it was non-null. */
   private void setNewAnchor(Anchor newAnchor) {
+
+    Log.e("====================", "setNewAnchor");
+//    if (anchors != null)
+//      Log.e("====================", anchor.toString());
+
     synchronized (anchorLock) {
-      if (anchor != null) {
-        anchor.detach();
-      }
-      anchor = newAnchor;
+
+      // TODO: 앵커 여러 개 배치
+      // -> 기존 앵커를 detach() 하지 않고 지속적으로 유지
+      // -> 추후 anchor를 배열에 넣어서 관리하면 삭제도 가능할 것 같다!
+//      if (anchor != null) {
+//        anchor.detach();
+//      }
+
+      // TODO: 앵커 여러 개 배치
+//      anchor = newAnchor;
+      anchors.add(newAnchor);
     }
+  }
+
+  private void resetAnchors(){
+    anchors.clear();
+  }
+
+
+  /** Resets the mode of the app to its initial state and removes the anchors. */
+  private void resetMode() {
+    hostButton.setText(R.string.host_button_text);
+    hostButton.setEnabled(true);
+    resolveButton.setText(R.string.resolve_button_text);
+    resolveButton.setEnabled(true);
+    roomCodeText.setText(R.string.initial_room_code);
+    currentMode = HostResolveMode.NONE;
+    firebaseManager.clearRoomListener();
+    hostListener = null;
+    resetAnchors();
+    snackbarHelper.hide(this);
+    cloudManager.clearListeners();
   }
 
 
@@ -486,13 +652,20 @@ public class CloudAnchorActivity extends AppCompatActivity
 
 
 
-  /** Callback function invoked when the Host Button is pressed. */
+
+
+
+  // [X]
+  // HOST 버튼 눌렀을 때
   private void onHostButtonPress() {
+
+    // HOST 모드이면 리셋
     if (currentMode == HostResolveMode.HOSTING) {
       resetMode();
       return;
     }
 
+    // ALLOW_SHARE_IMAGES_KEY?
     if (!sharedPreferences.getBoolean(ALLOW_SHARE_IMAGES_KEY, false)) {
       showNoticeDialog(this::onPrivacyAcceptedForHost);
     } else {
@@ -500,6 +673,25 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
   }
 
+  // [X]
+  // RESOLVE 버튼 눌렀을 시
+  private void onResolveButtonPress() {
+
+    // RESOLVE 모드이면 리셋
+    if (currentMode == HostResolveMode.RESOLVING) {
+      resetMode();
+      return;
+    }
+
+
+    if (!sharedPreferences.getBoolean(ALLOW_SHARE_IMAGES_KEY, false)) {
+      showNoticeDialog(this::onPrivacyAcceptedForResolve);
+    } else {
+      onPrivacyAcceptedForResolve();
+    }
+  }
+
+  // [X]
   private void onPrivacyAcceptedForHost() {
     if (hostListener != null) {
       return;
@@ -512,47 +704,15 @@ public class CloudAnchorActivity extends AppCompatActivity
     firebaseManager.getNewRoomCode(hostListener);
   }
 
-  /** Callback function invoked when the Resolve Button is pressed. */
-  private void onResolveButtonPress() {
-    if (currentMode == HostResolveMode.RESOLVING) {
-      resetMode();
-      return;
-    }
-
-    if (!sharedPreferences.getBoolean(ALLOW_SHARE_IMAGES_KEY, false)) {
-      showNoticeDialog(this::onPrivacyAcceptedForResolve);
-    } else {
-      onPrivacyAcceptedForResolve();
-    }
-  }
-
-
-  
-
-
-
-
-
+  // [X]
   private void onPrivacyAcceptedForResolve() {
     ResolveDialogFragment dialogFragment = new ResolveDialogFragment();
     dialogFragment.setOkListener(this::onRoomCodeEntered);
     dialogFragment.show(getSupportFragmentManager(), "ResolveDialog");
   }
 
-  /** Resets the mode of the app to its initial state and removes the anchors. */
-  private void resetMode() {
-    hostButton.setText(R.string.host_button_text);
-    hostButton.setEnabled(true);
-    resolveButton.setText(R.string.resolve_button_text);
-    resolveButton.setEnabled(true);
-    roomCodeText.setText(R.string.initial_room_code);
-    currentMode = HostResolveMode.NONE;
-    firebaseManager.clearRoomListener();
-    hostListener = null;
-    setNewAnchor(null);
-    snackbarHelper.hide(this);
-    cloudManager.clearListeners();
-  }
+
+
 
   /** Callback function invoked when the user presses the OK button in the Resolve Dialog. */
   private void onRoomCodeEntered(Long roomCode) {
@@ -601,12 +761,15 @@ public class CloudAnchorActivity extends AppCompatActivity
       }
     }
 
+
+    // [X]
     @Override
     public void onError(DatabaseError error) {
       Log.w(TAG, "A Firebase database error happened.", error.toException());
       snackbarHelper.showError(
           CloudAnchorActivity.this, getString(R.string.snackbar_firebase_error));
     }
+
 
     @Override
     public void onCloudTaskComplete(Anchor anchor) {
@@ -617,13 +780,20 @@ public class CloudAnchorActivity extends AppCompatActivity
             CloudAnchorActivity.this, getString(R.string.snackbar_host_error, cloudState));
         return;
       }
-      Preconditions.checkState(
-          cloudAnchorId == null, "The cloud anchor ID cannot have been set before.");
+
+
+      // TODO: 앵커 여러 개 배치
+//      Preconditions.checkState(
+//          cloudAnchorId == null, "The cloud anchor ID cannot have been set before.");
+
+
       cloudAnchorId = anchor.getCloudAnchorId();
       setNewAnchor(anchor);
       checkAndMaybeShare();
     }
 
+    // TODO: 앵커 여러 개 배치
+    // 클라우드에 배포한 이후 이 코드가 실행됨
     private void checkAndMaybeShare() {
       if (roomCode == null || cloudAnchorId == null) {
         return;
@@ -635,14 +805,7 @@ public class CloudAnchorActivity extends AppCompatActivity
   }
 
 
-
-
-
-
-
-
-
-
+  // [X]
   private final class CloudAnchorResolveStateListener
       implements CloudAnchorManager.CloudAnchorResolveListener {
     private final long roomCode;
@@ -666,6 +829,8 @@ public class CloudAnchorActivity extends AppCompatActivity
             CloudAnchorActivity.this, getString(R.string.snackbar_resolve_error, cloudState));
         return;
       }
+
+      // 성공적으로 resolved 된 경우
       snackbarHelper.showMessageWithDismiss(
           CloudAnchorActivity.this, getString(R.string.snackbar_resolve_success));
       setNewAnchor(anchor);
@@ -679,11 +844,14 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
   }
 
+
+  // [X]
   public void showNoticeDialog(HostResolveListener listener) {
     DialogFragment dialog = PrivacyNoticeDialogFragment.createDialog(listener);
     dialog.show(getSupportFragmentManager(), PrivacyNoticeDialogFragment.class.getName());
   }
 
+  // [X]
   @Override
   public void onDialogPositiveClick(DialogFragment dialog) {
     if (!sharedPreferences.edit().putBoolean(ALLOW_SHARE_IMAGES_KEY, true).commit()) {
@@ -691,4 +859,7 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
     createSession();
   }
+
+
+
 }

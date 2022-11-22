@@ -66,4 +66,35 @@
 
   </LinearLayout>
 
+
+  <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_alignParentBottom="true"
+      android:orientation="horizontal">
+
+    <Button
+        android:id="@+id/model1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="model1"/>
+
+    <Button
+        android:id="@+id/model2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="model2"/>
+
+    <Button
+        android:id="@+id/model3"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="model3"/>
+
+  </LinearLayout>
+
+
+
+
+
 </RelativeLayout>
