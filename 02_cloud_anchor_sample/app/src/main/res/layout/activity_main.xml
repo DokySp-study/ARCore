@@ -71,27 +71,56 @@
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
       android:layout_alignParentBottom="true"
-      android:orientation="horizontal">
+      android:orientation="vertical"
+    >
 
-    <Button
-        android:id="@+id/model1"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="model1"/>
+        android:gravity="center"
+        android:orientation="horizontal">
 
-    <Button
-        android:id="@+id/model2"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="model2"/>
+      <Button
+          android:id="@+id/model1"
+          android:layout_width="80dp"
+          android:layout_height="wrap_content"
+          android:text="model1"/>
 
-    <Button
-        android:id="@+id/model3"
-        android:layout_width="wrap_content"
+      <Button
+          android:id="@+id/model2"
+          android:layout_width="80dp"
+          android:layout_height="wrap_content"
+          android:text="model2"/>
+
+      <Button
+          android:id="@+id/model3"
+          android:layout_width="80dp"
+          android:layout_height="wrap_content"
+          android:text="model3"/>
+
+      <Button
+          android:id="@+id/model4"
+          android:layout_width="80dp"
+          android:layout_height="wrap_content"
+          android:text="model4"/>
+
+      <Button
+          android:id="@+id/model5"
+          android:layout_width="80dp"
+          android:layout_height="wrap_content"
+          android:text="model5"/>
+
+    </LinearLayout>
+
+    <TextView
+        android:text=" \n \n \n"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="model3"/>
+        />
 
   </LinearLayout>
+
+
 
 
 
