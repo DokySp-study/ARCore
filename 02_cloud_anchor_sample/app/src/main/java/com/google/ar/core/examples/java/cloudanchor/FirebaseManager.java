@@ -28,6 +28,11 @@ import com.google.firebase.database.MutableData;
 import com.google.firebase.database.Transaction;
 import com.google.firebase.database.ValueEventListener;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+
 /** A helper class to manage all communications with Firebase. */
 class FirebaseManager {
   private static final String TAG =
@@ -47,7 +52,7 @@ class FirebaseManager {
   interface CloudAnchorIdListener {
 
     /** Invoked when a new cloud anchor ID is available. */
-    void onNewCloudAnchorId(String cloudAnchorId);
+    void onNewCloudAnchorId(ArrayList<String> cloudAnchorIdList, ArrayList<Integer> objectIdxList);
   }
 
   // Names of the nodes used in the Firebase Database
@@ -56,9 +61,11 @@ class FirebaseManager {
 
   // Some common keys and values used when writing to the Firebase Database.
   private static final String KEY_DISPLAY_NAME = "display_name";
-  private static final String KEY_ANCHOR_ID = "hosted_anchor_id";
+  private static final String KEY_ANCHOR_ID_QUEUE = "hosted_anchor_id_queue";
   private static final String KEY_TIMESTAMP = "updated_at_timestamp";
-  private static final String DISPLAY_NAME_VALUE = "Android EAP Sample";
+  private static final String KEY_OBJECT_IDX_QUEUE = "object_index_queue";
+
+  private static final String DISPLAY_NAME_VALUE = "AR World";
 
   private final FirebaseApp app;
   private final DatabaseReference hotspotListRef;
@@ -122,11 +129,16 @@ class FirebaseManager {
   }
 
   /** Stores the given anchor ID in the given room code. */
-  void storeAnchorIdInRoom(Long roomCode, String cloudAnchorId) {
+  void storeAnchorIdInRoom(Long roomCode, ArrayList<String> cloudAnchorId, ArrayList<Integer> objectIndexQueue) {
+
     Preconditions.checkNotNull(app, "Firebase App was null");
+
     DatabaseReference roomRef = hotspotListRef.child(String.valueOf(roomCode));
     roomRef.child(KEY_DISPLAY_NAME).setValue(DISPLAY_NAME_VALUE);
-    roomRef.child(KEY_ANCHOR_ID).setValue(cloudAnchorId);
+
+    roomRef.child(KEY_ANCHOR_ID_QUEUE).setValue(cloudAnchorId);
+    roomRef.child(KEY_OBJECT_IDX_QUEUE).setValue(objectIndexQueue);
+
     roomRef.child(KEY_TIMESTAMP).setValue(System.currentTimeMillis());
   }
 
@@ -134,6 +146,8 @@ class FirebaseManager {
    * Registers a new listener for the given room code. The listener is invoked whenever the data for
    * the room code is changed.
    */
+
+
   void registerNewListenerForRoom(Long roomCode, CloudAnchorIdListener listener) {
     Preconditions.checkNotNull(app, "Firebase App was null");
     clearRoomListener();
@@ -142,13 +156,27 @@ class FirebaseManager {
         new ValueEventListener() {
           @Override
           public void onDataChange(DataSnapshot dataSnapshot) {
-            Object valObj = dataSnapshot.child(KEY_ANCHOR_ID).getValue();
-            if (valObj != null) {
-              String anchorId = String.valueOf(valObj);
-              if (!anchorId.isEmpty()) {
-                listener.onNewCloudAnchorId(anchorId);
+
+            Object valObjAnchor = dataSnapshot.child(KEY_ANCHOR_ID_QUEUE).getValue();
+            Object valObjIdx = dataSnapshot.child(KEY_OBJECT_IDX_QUEUE).getValue();
+
+            // Cast Obj to ArrayList
+            ArrayList<String> cloudIdList = new ArrayList<String>();
+            ArrayList<Integer> objectIdxList = new ArrayList<Integer>();
+
+            if(valObjAnchor != null && valObjIdx != null) {
+              for (Object a : (Collection<?>) valObjAnchor) {
+                cloudIdList.add((String) a);
+              }
+              for(Object a: (Collection<?>)valObjIdx){
+                // https://wwwnghks.tistory.com/123
+                // String에서 parseInt해야 정상적으로 잡힘
+                objectIdxList.add( Integer.parseInt(a.toString()) );
               }
             }
+
+            listener.onNewCloudAnchorId(cloudIdList, objectIdxList);
+
           }
 
           @Override
