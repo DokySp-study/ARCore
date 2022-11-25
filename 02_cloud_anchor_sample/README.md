@@ -13,4 +13,5 @@ using the ARCore Cloud Service.
 - `com.google.ar.core` 패키지 안에 `Anchor anchor;`로 선언됨
 - `void handleTap()`: 
   - HOST 모드일 때만 `anchor` 생성할 수 있도록 제한이 걸려있음
+  
 - `void handleTap()`: `anchor`

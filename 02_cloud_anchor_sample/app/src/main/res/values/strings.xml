@@ -16,7 +16,7 @@
 -->
 <resources>
   <!-- Strings in the main activity -->
-  <string name="app_name">Cloud Anchor Example</string>
+  <string name="app_name">AR World</string>
   <string name="cancel">Cancel</string>
   <string name="host_button_text">Host</string>
   <string name="host_dialog_title">Host an Anchor</string>
