@@ -21,6 +21,7 @@ import androidx.annotation.Nullable;
 import com.google.ar.core.Anchor;
 import com.google.ar.core.Anchor.CloudAnchorState;
 import com.google.ar.core.Session;
+import com.google.ar.core.examples.java.common.utils.Tuple;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -47,7 +48,7 @@ class CloudAnchorManager {
   interface CloudAnchorResolveListener {
 
     /** This method is invoked when the results of a Cloud Anchor operation are available. */
-    void onCloudTaskComplete(Anchor anchor);
+    void onCloudTaskComplete(Anchor anchor, int objectId);
 
     /** This method show the toast message. */
     void onShowResolveMessage();
@@ -55,7 +56,7 @@ class CloudAnchorManager {
 
   @Nullable private Session session = null;
   private final HashMap<Anchor, CloudAnchorHostListener> pendingHostAnchors = new HashMap<>();
-  private final HashMap<Anchor, CloudAnchorResolveListener> pendingResolveAnchors = new HashMap<>();
+  private final HashMap<Anchor, Tuple<Integer, CloudAnchorResolveListener>> pendingResolveAnchors = new HashMap<>();
 
   /**
    * This method is used to set the session, since it might not be available when this object is
@@ -80,11 +81,14 @@ class CloudAnchorManager {
    * available.
    */
   synchronized void resolveCloudAnchor(
-      String anchorId, CloudAnchorResolveListener listener, long startTimeMillis) {
+      String anchorId, int objectId, CloudAnchorResolveListener listener, long startTimeMillis) {
     Preconditions.checkNotNull(session, "The session cannot be null.");
     Anchor newAnchor = session.resolveCloudAnchor(anchorId);
     deadlineForMessageMillis = startTimeMillis + DURATION_FOR_NO_RESOLVE_RESULT_MS;
-    pendingResolveAnchors.put(newAnchor, listener);
+
+    // 오브젝트 정보 넘겨줌
+    Tuple<Integer, CloudAnchorResolveListener> newObject = new Tuple<>(objectId, listener);
+    pendingResolveAnchors.put(newAnchor, newObject);
   }
 
   /** Should be called after a {@link Session#update()} call. */
@@ -102,14 +106,22 @@ class CloudAnchorManager {
       }
     }
 
-    Iterator<Map.Entry<Anchor, CloudAnchorResolveListener>> resolveIter =
+    Iterator<Map.Entry<Anchor, Tuple<Integer, CloudAnchorResolveListener>>> resolveIter =
         pendingResolveAnchors.entrySet().iterator();
     while (resolveIter.hasNext()) {
-      Map.Entry<Anchor, CloudAnchorResolveListener> entry = resolveIter.next();
+      Map.Entry<Anchor, Tuple<Integer, CloudAnchorResolveListener>> entry = resolveIter.next();
       Anchor anchor = entry.getKey();
-      CloudAnchorResolveListener listener = entry.getValue();
+
+      // listener하고 object idx를 받는다
+      Tuple<Integer, CloudAnchorResolveListener> target = entry.getValue();
+
+      // 값 추출
+      int objectId = target.getA();
+      CloudAnchorResolveListener listener = target.getB();
+
+      // 정상 수행 시, 해당 앵커&오브젝트 추가
       if (isReturnableState(anchor.getCloudAnchorState())) {
-        listener.onCloudTaskComplete(anchor);
+        listener.onCloudTaskComplete(anchor, objectId);
         resolveIter.remove();
       }
       if (deadlineForMessageMillis > 0 && SystemClock.uptimeMillis() > deadlineForMessageMillis) {

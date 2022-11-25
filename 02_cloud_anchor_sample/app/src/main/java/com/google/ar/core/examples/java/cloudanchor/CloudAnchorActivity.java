@@ -131,7 +131,6 @@ public class CloudAnchorActivity extends AppCompatActivity
 
   private ArrayList<Integer> objectIndexQueue = new ArrayList<Integer>();
 
-  private boolean isFirstResolveConnection = true;
 
   private final PlaneRenderer planeRenderer = new PlaneRenderer();
   private final PointCloudRenderer pointCloudRenderer = new PointCloudRenderer();
@@ -265,11 +264,6 @@ public class CloudAnchorActivity extends AppCompatActivity
   }
 
 
-
-
-
-
-  // [X]
   @Override
   protected void onDestroy() {
     // Clear all registered listeners.
@@ -287,7 +281,6 @@ public class CloudAnchorActivity extends AppCompatActivity
     super.onDestroy();
   }
 
-  // [X]
   @Override
   protected void onResume() {
     super.onResume();
@@ -302,7 +295,8 @@ public class CloudAnchorActivity extends AppCompatActivity
     displayRotationHelper.onResume();
   }
 
-  // [X] 세션 생성 (분석 불필요)
+
+  // AR 세션 생성
   private void createSession() {
     if (session == null) {
       Exception exception = null;
@@ -368,7 +362,6 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
   }
 
-  // [X]
   @Override
   public void onPause() {
     super.onPause();
@@ -385,7 +378,6 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
   }
 
-  // [X]
   @Override
   public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
     super.onRequestPermissionsResult(requestCode, permissions, results);
@@ -400,17 +392,11 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
   }
 
-  // [X]
   @Override
   public void onWindowFocusChanged(boolean hasFocus) {
     super.onWindowFocusChanged(hasFocus);
     FullScreenHelper.setFullScreenOnWindowFocusChanged(this, hasFocus);
   }
-
-
-
-
-
 
 
   /**
@@ -435,8 +421,7 @@ public class CloudAnchorActivity extends AppCompatActivity
 
         // 설정된 엥커가 없고, single tap queue가 비어있지 않을 때, camera가 tracking 상태일 때
 
-
-        // TODO: 앵커 여러 개 배치
+        // 앵커 여러 개 배치
 //        if (anchor == null  &&  queuedSingleTap != null  &&  cameraTrackingState == TrackingState.TRACKING) {
         if (queuedSingleTap != null  &&  cameraTrackingState == TrackingState.TRACKING) {
 
@@ -446,11 +431,9 @@ public class CloudAnchorActivity extends AppCompatActivity
           // 조건이 맞지 않을경우 IllegalStateException
 
           // TODO: resolver도 배치 가능하도록 함
-//          Preconditions.checkState(
-//              currentMode == HostResolveMode.HOSTING,
-//              "We should only be creating an anchor in hosting mode.");
-
-
+          Preconditions.checkState(
+              currentMode == HostResolveMode.HOSTING,
+              "We should only be creating an anchor in hosting mode.");
 
           // for (var a in array){} 문법이랑 동일
           for (HitResult hit : frame.hitTest(queuedSingleTap)) {
@@ -478,9 +461,6 @@ public class CloudAnchorActivity extends AppCompatActivity
               break; // Only handle the first valid hit.
             }
           }
-
-
-
         }
       }
       queuedSingleTap = null;
@@ -514,11 +494,9 @@ public class CloudAnchorActivity extends AppCompatActivity
       planeRenderer.createOnGlThread(this, "models/trigrid.png");
       pointCloudRenderer.createOnGlThread(this);
 
-      // TODO: 모델을 여러 개 바꾸는 기능
+      // 모델을 여러 개 바꾸는 기능
       // 모델 세팅 코드
       // virtualObject -> 배열로 관리하고 별도 idx queue를 만들어서 관리
-
-
 
       for(int i = 0; i < modelFileNames.length; i++){
 
@@ -614,7 +592,7 @@ public class CloudAnchorActivity extends AppCompatActivity
       // Check if the anchor can be visualized or not, and get its pose if it can be.
 
 
-      // TODO: 앵커 여러 개 배치
+      // 앵커 여러 개 배치
       // anchor를 anchorMatrix로 변환하는 과정이 있음
       // anchor, anchorMatrix 둘 다 배열로 관리해야 함
       boolean shouldDrawAnchor = false;
@@ -631,7 +609,6 @@ public class CloudAnchorActivity extends AppCompatActivity
             anchor.getPose().toMatrix(anchorMatrix, 0);
 
             anchorMatrixList.add(anchorMatrix);
-
           }
         }
 
@@ -640,8 +617,6 @@ public class CloudAnchorActivity extends AppCompatActivity
         } else {
           shouldDrawAnchor = false;
         }
-
-
       }
 
       // Visualize anchor.
@@ -653,6 +628,7 @@ public class CloudAnchorActivity extends AppCompatActivity
 //        float scaleFactor = 0.01f;
 
         int ii = 0;
+
         for (float[] anchorMatrix : anchorMatrixList) {
 
           int targetObjectIndx = objectIndexQueue.get(ii);
@@ -668,8 +644,6 @@ public class CloudAnchorActivity extends AppCompatActivity
 
           ii++;
         }
-
-
       }
     } catch (Throwable t) {
       // Avoid crashing the application due to unhandled exceptions.
@@ -680,31 +654,16 @@ public class CloudAnchorActivity extends AppCompatActivity
 
   /** Sets the new value of the current anchor. Detaches the old anchor, if it was non-null. */
   private void setNewAnchor(Anchor newAnchor, int objectIndex) {
-
     synchronized (anchorLock) {
-
-      // TODO: 앵커 여러 개 배치
+      // 앵커 여러 개 배치
       // -> 기존 앵커를 detach() 하지 않고 지속적으로 유지
-      // -> 추후 anchor를 배열에 넣어서 관리하면 삭제도 가능할 것 같다!
 //      if (anchor != null) {
 //        anchor.detach();
 //      }
-
-      // TODO: 앵커 여러 개 배치
 //      anchor = newAnchor;
 
-      // TODO: 중복으로 호출 / 찍히는 문제
       anchors.add(newAnchor);
-
-      if (anchors.size() <= objectIndexQueue.size()) {
-        for(int i = 0; i < (objectIndexQueue.size() - anchors.size() + 1); i++){
-          objectIndexQueue.remove(objectIndexQueue.size() - 1);
-        }
-      }
-      if (anchors.size() > objectIndexQueue.size()){
-        objectIndexQueue.add(objectIndex);
-      }
-
+      objectIndexQueue.add(objectIndex);
     }
   }
 
@@ -717,7 +676,13 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
   }
 
-
+  /**
+   * ## 아래 항목을 초기화
+   * - anchors
+   * - cloudAnchors
+   * - anchorMatrixList
+   * - objectIndexQueue
+   */
   private void resetAnchors(){
     anchors.clear();
     cloudAnchors.clear();
@@ -739,20 +704,9 @@ public class CloudAnchorActivity extends AppCompatActivity
     resetAnchors();
     snackbarHelper.hide(this);
     cloudManager.clearListeners();
-    isFirstResolveConnection = true;
   }
 
 
-
-
-
-
-
-
-
-
-
-  // [X]
   // HOST 버튼 눌렀을 때
   private void onHostButtonPress() {
 
@@ -770,16 +724,13 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
   }
 
-  // [X]
   // RESOLVE 버튼 눌렀을 시
   private void onResolveButtonPress() {
-
     // RESOLVE 모드이면 리셋
     if (currentMode == HostResolveMode.RESOLVING) {
       resetMode();
       return;
     }
-
 
     if (!sharedPreferences.getBoolean(ALLOW_SHARE_IMAGES_KEY, false)) {
       showNoticeDialog(this::onPrivacyAcceptedForResolve);
@@ -788,7 +739,6 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
   }
 
-  // [X]
   private void onPrivacyAcceptedForHost() {
     if (hostListener != null) {
       return;
@@ -801,7 +751,6 @@ public class CloudAnchorActivity extends AppCompatActivity
     firebaseManager.getNewRoomCode(hostListener);
   }
 
-  // [X]
   private void onPrivacyAcceptedForResolve() {
     ResolveDialogFragment dialogFragment = new ResolveDialogFragment();
     dialogFragment.setOkListener(this::onRoomCodeEntered);
@@ -851,10 +800,9 @@ public class CloudAnchorActivity extends AppCompatActivity
       default:
         break;
     }
-
   }
 
-
+  private int prevQueueSize = 0;
 
   /** Callback function invoked when the user presses the OK button in the Resolve Dialog. */
   private void onRoomCodeEntered(Long roomCode) {
@@ -874,57 +822,28 @@ public class CloudAnchorActivity extends AppCompatActivity
           CloudAnchorResolveStateListener resolveListener = new CloudAnchorResolveStateListener(roomCode);
           Preconditions.checkNotNull(resolveListener, "The resolve listener cannot be null.");
 
+          //
+          // 두 개가 모두 동기 업데이트 된 경우에만 실행
+          if(cloudAnchorIdList.size() == objectIdxList.size()) {
+            // cloudAnchor의 오브젝트 개수가 업데이트 된 경우
+            if(prevQueueSize < cloudAnchorIdList.size()){
 
+              // 모든 앵커 값을 초기화한 이후
+              // 서버로부터 받은 엥커를 대입
+              prevQueueSize = cloudAnchorIdList.size();
+              resetAnchors();
+
+              for (int ii=0; ii<cloudAnchorIdList.size(); ii++) {
+                cloudManager.resolveCloudAnchor(cloudAnchorIdList.get(ii), objectIdxList.get(ii), resolveListener, SystemClock.uptimeMillis());
+              }
+            }
+          }
+
+          // 코드 삭제
           // 처음인 경우, cloud anchor 전부 불러오기
-          if (isFirstResolveConnection) {
-            isFirstResolveConnection = false;
-
-            for (String cloudAnchorId: cloudAnchorIdList) {
-              cloudManager.resolveCloudAnchor(cloudAnchorId, resolveListener, SystemClock.uptimeMillis());
-            }
-
-            for (int i = 0; i < objectIdxList.size(); i++) {
-              // 중복 방지
-              if(cloudAnchorIdList.size() > objectIndexQueue.size()) {
-                objectIndexQueue.add(objectIdxList.get(i));
-              }
-            }
-
-            Log.e("=========if=========", cloudAnchorIdList + "");
-            Log.e("=========if=========", objectIndexQueue + "");
-
-          }
-
           // 아닌 경우, 마지막 cloud anchor 만 불러오기
-          else {
-
-            if(!cloudAnchorIdList.isEmpty() && !objectIdxList.isEmpty()) {
-
-              String cloudAnchorId = cloudAnchorIdList.get(cloudAnchorIdList.size() - 1);
-              int objectIdx = objectIdxList.get(objectIdxList.size() - 1);
-
-              cloudManager.resolveCloudAnchor(cloudAnchorId, resolveListener, SystemClock.uptimeMillis());
-
-              // 중복 방지
-              if (cloudAnchorIdList.size() <= objectIndexQueue.size()) {
-                for(int i = 0; i < (objectIndexQueue.size() - cloudAnchorIdList.size() + 1); i++){
-                  objectIndexQueue.remove(objectIndexQueue.size() - 1);
-                }
-              }
-              if(cloudAnchorIdList.size() > objectIndexQueue.size()) {
-                objectIndexQueue.add(objectIdx);
-              }
-
-            }
-
-
-            Log.e("=========else=========", cloudAnchorIdList + "");
-            Log.e("=========else=========", objectIndexQueue + "");
-
-          }
 
         });
-
   }
 
   /**
@@ -953,15 +872,12 @@ public class CloudAnchorActivity extends AppCompatActivity
       }
     }
 
-
-    // [X]
     @Override
     public void onError(DatabaseError error) {
       Log.w(TAG, "A Firebase database error happened.", error.toException());
       snackbarHelper.showError(
           CloudAnchorActivity.this, getString(R.string.snackbar_firebase_error));
     }
-
 
     @Override
     public void onCloudTaskComplete(Anchor anchor) {
@@ -973,37 +889,25 @@ public class CloudAnchorActivity extends AppCompatActivity
         return;
       }
 
-
-      // TODO: 앵커 여러 개 배치
-//      Preconditions.checkState(
-//          cloudAnchorId == null, "The cloud anchor ID cannot have been set before.");
-
-//      cloudAnchorId = anchor.getCloudAnchorId();
-      // cloudAnchorId 가 나온 이후 Firebase 업데이트를 위해 재호출
-//      setNewAnchor(anchor);
       setNewCloudAnchor(anchor);
       checkAndMaybeShare();
     }
 
-    // TODO: 앵커 여러 개 배치
+    // 앵커 여러 개 배치
     // 클라우드에 배포한 이후 이 코드가 실행됨
     private void checkAndMaybeShare() {
       if (roomCode == null) {
         return;
       }
 
-
       // 서버로 정보 전송
       firebaseManager.storeAnchorIdInRoom(roomCode, cloudAnchors, objectIndexQueue);
       snackbarHelper.showMessageWithDismiss(
           CloudAnchorActivity.this, getString(R.string.snackbar_cloud_id_shared));
-
-
     }
   }
 
 
-  // [X]
   private final class CloudAnchorResolveStateListener
       implements CloudAnchorManager.CloudAnchorResolveListener {
     private final long roomCode;
@@ -1013,7 +917,7 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
 
     @Override
-    public void onCloudTaskComplete(Anchor anchor) {
+    public void onCloudTaskComplete(Anchor anchor, int objectId) {
       // When the anchor has been resolved, or had a final error state.
       CloudAnchorState cloudState = anchor.getCloudAnchorState();
       if (cloudState.isError()) {
@@ -1028,13 +932,11 @@ public class CloudAnchorActivity extends AppCompatActivity
         return;
       }
 
-
       // 성공적으로 resolved 된 경우
       snackbarHelper.showMessageWithDismiss(
           CloudAnchorActivity.this, getString(R.string.snackbar_resolve_success));
 
-      setNewAnchor(anchor, objectIndexQueue.get(objectIndexQueue.size() - 1));
-
+      setNewAnchor(anchor, objectId);
     }
 
     @Override
@@ -1046,13 +948,11 @@ public class CloudAnchorActivity extends AppCompatActivity
   }
 
 
-  // [X]
   public void showNoticeDialog(HostResolveListener listener) {
     DialogFragment dialog = PrivacyNoticeDialogFragment.createDialog(listener);
     dialog.show(getSupportFragmentManager(), PrivacyNoticeDialogFragment.class.getName());
   }
 
-  // [X]
   @Override
   public void onDialogPositiveClick(DialogFragment dialog) {
     if (!sharedPreferences.edit().putBoolean(ALLOW_SHARE_IMAGES_KEY, true).commit()) {
@@ -1060,7 +960,4 @@ public class CloudAnchorActivity extends AppCompatActivity
     }
     createSession();
   }
-
-
-
 }
